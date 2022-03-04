@@ -15,11 +15,14 @@
 // Header file for the classes stored in the TTree if any.
 #include "vector"
 #include "vector"
+#ifdef __MAKECINT__
+#pragma link C++ class vector<vector<int>>+;
+#endif // __MAKECINT__
 struct Voxel{
     Long64_t VoxelID;
     double X,Y,Z,Q;
     std::vector<int> PDGCode;
-    std::vector<double> QPDg;
+    std::vector<int> TrackID;
 
 };
 struct Electron
@@ -30,8 +33,10 @@ struct Electron
 
 struct HitMap{
     Int_t EventID;
-    std::vector<int> Pdg_code;
-    std::vector<int> TrackID;
+    std::vector<int> vPdg_code;
+    int Pdg_code;
+    std::vector<int> vTrackID;
+    int TrackID;
     std::vector<double>StartX;
     std::vector<double>StartY;
     std::vector<double>StartZ;
@@ -215,12 +220,12 @@ public :
     TFile *vxfile= nullptr;
     Int_t Event_ID;
     std::vector<Long64_t>VoxelID;
-    std::vector<Int_t>Voxel_PdgCode;
+    std::vector<std::vector<int>>Voxel_PdgCode=std::vector<std::vector<int>>();
     std::vector<double>Voxel_x;
     std::vector<double>Voxel_y;
     std::vector<double>Voxel_z;
     std::vector<double>Voxel_Q;
-    std::vector<double>Voxel_QPDG;
+    std::vector<std::vector<int>>Voxel_TrackID=std::vector<std::vector<int>>();
 
     };
 
@@ -232,9 +237,11 @@ ProtonDecayAna::ProtonDecayAna(TTree *tree) : fChain(0)
 // if parameter tree is not specified (or zero), connect the file
 // used to generate this class and read the Tree.
    if (tree == 0) {
-      f = (TFile*)gROOT->GetListOfFiles()->FindObject("/media/argon/DATA/Ilker/Proton_Decay.root");
+      //f = (TFile*)gROOT->GetListOfFiles()->FindObject("/media/argon/DATA/Ilker/Proton_Decay.root");
+      f = (TFile*)gROOT->GetListOfFiles()->FindObject("/media/ilker/writable/QPIX_DATA/Proton_Decay.root");
       if (!f || !f->IsOpen()) {
-         f = new TFile("/media/argon/DATA/Ilker/Proton_Decay.root");
+         //f = new TFile("/media/argon/DATA/Ilker/Proton_Decay.root");
+         f = new TFile("/media/ilker/writable/QPIX_DATA/Proton_Decay.root");
       }
       f->GetObject("event_tree",tree);
 

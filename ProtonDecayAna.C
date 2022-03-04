@@ -15,8 +15,11 @@
 #include <random>
 #include <cmath>
 #include "TH3D.h"
+#include <vector>
 
-
+#ifdef __MAKECINT__
+#pragma link C++ class std::vector < std::vector<int> >+;
+#endif
 using namespace std;
 void ProtonDecayAna::Getdedx(Int_t Pdg_Code,Int_t limit,Int_t PionHitLimit=2) {
 
@@ -70,6 +73,9 @@ void ProtonDecayAna::Getdedx(Int_t Pdg_Code,Int_t limit,Int_t PionHitLimit=2) {
                  */
                 //cout<<"E -> " <<hit_energy_deposit->at(i)<< " L -> " << hit_length->at(i)<<endl;
                 // cout<<"T "<< hit_start_t->at(i)<<" X -> " <<hit_start_x->at(i)<< " Y -> " << hit_start_y->at(i)<< " Z -> " << hit_start_z->at(i)<<endl;
+                if(!((hit_start_x->at(i)>-115 && hit_start_x->at(i)<115 ) &&
+                   (hit_start_y->at(i)>-300 && hit_start_y->at(i)<300 ) &&
+                     (hit_start_z->at(i)>-180 && hit_start_z->at(i)<180 ))) continue;
                 E_.push_back(hit_energy_deposit->at(i));
                 X_.push_back(hit_start_x->at(i));
                 Y_.push_back(hit_start_y->at(i));
@@ -125,14 +131,15 @@ void ProtonDecayAna::Getdedx(Int_t Pdg_Code,Int_t limit,Int_t PionHitLimit=2) {
     TGraph *gr;
     gr = new TGraph(dedx.size(), &range[0], &dedx[0]);
     gr->SetTitle("DeDx vs  ResidualRange");
-    gr->GetXaxis()->SetTitle("Residual Range");
-    gr->GetYaxis()->SetTitle("dedx");
+    gr->GetXaxis()->SetTitle("Residual Range (cm)");
+    gr->GetYaxis()->SetTitle("dedx (MeV/cm)");
     gr->SetMinimum(0);
     gr->SetMaximum(60);
     gr->GetXaxis()->SetLimits(0,40);
     c1->cd(1);
     gr->Draw("AP");
     c1->cd(2);
+    h2->GetXaxis()->SetTitle("Total Deposited Energy (MeV)");
     h2->Draw();
 
 }
@@ -417,7 +424,8 @@ std::map<Long64_t,Voxel*>ProtonDecayAna::VoxelizetheHits(Int_t Event_ID,std::str
             if(voxels.count(VoxelID)) {
 
                 voxels[VoxelID]->Q+=1;
-
+                voxels[VoxelID]->TrackID.push_back(hit->vTrackID.at(ient));
+                //voxels[VoxelID]->PDGCode.push_back(hit->vPdg_code.at(ient));
                 //Find the Index of the Current PDG
                 //std::vector<int>::iterator itr = std::find(voxels[VoxelID]->PDGCode.begin(), voxels[VoxelID]->PDGCode.end(), hit->Pdg_code);
                 //voxels[VoxelID]->QPDg[std::distance(voxels[VoxelID]->PDGCode.begin(), itr)]+=1;
@@ -429,8 +437,8 @@ std::map<Long64_t,Voxel*>ProtonDecayAna::VoxelizetheHits(Int_t Event_ID,std::str
                 v1->X= VoxelX;
                 v1->Y=VoxelY;
                 v1->Z=VoxelZ;
-                v1->PDGCode.push_back(hit->Pdg_code);
-                v1->QPDg.push_back(1);
+                v1->TrackID.push_back(hit->vTrackID.at(ient));
+                //v1->PDGCode.push_back(hit->vPdg_code.at(ient));
                 voxels.insert(pair<Long64_t,Voxel*>(VoxelID,v1));
             }
             indexer += 1;
@@ -562,10 +570,10 @@ HitMap* ProtonDecayAna::GetSingleEventHits(Long64_t jentry){
     hit->EventID=jentry;
 
     for (int i = 0; i < number_hits; i++) {
-
-
-            hit->TrackID.push_back(particle_track_id->at(i));
-            hit->Pdg_code.push_back(particle_pdg_code->at(i));
+            hit->vTrackID.push_back(hit_track_id->at(i));
+            auto it = find(particle_track_id->begin(), particle_track_id->end(), hit_track_id->at(i));
+            int index = it - particle_track_id->begin();
+            hit->vPdg_code.push_back(particle_pdg_code->at(index));
             hit->DepositedEE.push_back(hit_energy_deposit->at(i));
             hit->StartX.push_back(hit_start_x->at(i));
             hit->StartY.push_back(hit_start_y->at(i));
@@ -576,7 +584,6 @@ HitMap* ProtonDecayAna::GetSingleEventHits(Long64_t jentry){
             hit->EndZ.push_back(hit_end_z->at(i));
             hit->EndT.push_back(hit_end_t->at(i));
             CountPionHits++;
-
 
     }
     return hit;
@@ -740,16 +747,19 @@ void ProtonDecayAna::VoxelFloor(double XTrue,double YTrue,double ZTrue,double XS
 
 // Saving to File
 void ProtonDecayAna::InitializeFile(string Name){
+
     vxfile=TFile::Open(  Name.c_str(),"RECREATE");
     vxtree =new TTree("voxels","Voxels for ProtonDecay");
+    //gInterpreter->GenerateDictionary("vector<vector<int> >", "vector");
     vxtree->Branch("EventID",&Event_ID,"EventID/I");
     vxtree->Branch("PdgCode",&Voxel_PdgCode);
-    vxtree->Branch("QPDG",&Voxel_QPDG);
+    vxtree->Branch("TrackID",&Voxel_TrackID);
     vxtree->Branch("VoxelID",&VoxelID);
     vxtree->Branch("x",&Voxel_x);
     vxtree->Branch("y",&Voxel_y);
     vxtree->Branch("z",&Voxel_z);
     vxtree->Branch("q",&Voxel_Q);
+
 }
 void ProtonDecayAna::Clear(){
     Event_ID=-1;
@@ -759,7 +769,7 @@ void ProtonDecayAna::Clear(){
     Voxel_z.clear();
     Voxel_Q.clear();
     Voxel_PdgCode.clear();
-    Voxel_QPDG.clear();
+    Voxel_TrackID.clear();
 }
 void ProtonDecayAna::SavetoFile(){
     vxtree->Write();
@@ -783,14 +793,14 @@ void ProtonDecayAna::SaveVoxelsToFile(Int_t StartEvent,Int_t EndEvent,std::strin
             Event_ID=i;
             for (auto &x:voxels){
                 if(x.second->Q>=1){
-                VoxelID.push_back(x.second->VoxelID);
-                Voxel_PdgCode=x.second->PDGCode;
-                Voxel_QPDG=x.second->QPDg;
-                Voxel_x.push_back(x.second->X);
-                Voxel_y.push_back(x.second->Y);
-                Voxel_z.push_back(x.second->Z);
-                Voxel_Q.push_back(x.second->Q);
-                count++;
+                    VoxelID.push_back(x.second->VoxelID);
+                    Voxel_x.push_back(x.second->X);
+                    Voxel_y.push_back(x.second->Y);
+                    Voxel_z.push_back(x.second->Z);
+                    Voxel_Q.push_back(x.second->Q);
+                    Voxel_TrackID.push_back(x.second->TrackID);
+                    Voxel_PdgCode.push_back(x.second->PDGCode);
+                    count++;
                 } else continue;
             }
 
