@@ -13,17 +13,14 @@
 #include <TFile.h>
 
 // Header file for the classes stored in the TTree if any.
-#include "vector"
-#include "vector"
-#ifdef __MAKECINT__
-#pragma link C++ class vector<vector<int>>+;
-#endif // __MAKECINT__
+#include <vector>
+using namespace std;
 struct Voxel{
     Long64_t VoxelID;
     double X,Y,Z,Q;
     std::vector<int> PDGCode;
     std::vector<int> TrackID;
-
+    std::vector<int> QTrackID;
 };
 struct Electron
 {
@@ -210,7 +207,7 @@ public :
     void Clear();
     void InitializeFile(std::string Name);
     void SavetoFile();
-    void SaveVoxelsToFile(Int_t StartEvent,Int_t EndEvent,std::string Phase);
+    void SaveVoxelsToFile(Int_t StartEvent,Int_t EndEvent,std::string Fname,std::string Phase);
     void PlotVoxels(Int_t EventID,std::string fileName) ;
     TTree * GetVoxelsFromFile(Int_t EventID,std::string fileName);
 
@@ -220,12 +217,13 @@ public :
     TFile *vxfile= nullptr;
     Int_t Event_ID;
     std::vector<Long64_t>VoxelID;
-    std::vector<std::vector<int>>Voxel_PdgCode=std::vector<std::vector<int>>();
-    std::vector<double>Voxel_x;
-    std::vector<double>Voxel_y;
-    std::vector<double>Voxel_z;
-    std::vector<double>Voxel_Q;
-    std::vector<std::vector<int>>Voxel_TrackID=std::vector<std::vector<int>>();
+    std::vector<std::vector<int>>Voxel_PdgCode;
+    std::vector<int>Voxel_x;
+    std::vector<int>Voxel_y;
+    std::vector<int>Voxel_z;
+    std::vector<int>Voxel_Q;
+    std::vector<std::vector<int>>Voxel_QTrackID;
+    std::vector<std::vector<int>>Voxel_TrackID;
 
     };
 

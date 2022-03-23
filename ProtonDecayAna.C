@@ -17,9 +17,6 @@
 #include "TH3D.h"
 #include <vector>
 
-#ifdef __MAKECINT__
-#pragma link C++ class std::vector < std::vector<int> >+;
-#endif
 using namespace std;
 void ProtonDecayAna::Getdedx(Int_t Pdg_Code,Int_t limit,Int_t PionHitLimit=2) {
 
@@ -364,7 +361,6 @@ std::map<Long64_t,Voxel*>ProtonDecayAna::VoxelizetheHits(Int_t Event_ID,std::str
 
         // Loop through the electrons
 
-
         for (int i = 0; i < Nelectron; i++) {
             // calculate drift time for diffusion
             T_drift = electron_loc_z / E_vel;
@@ -373,7 +369,6 @@ std::map<Long64_t,Voxel*>ProtonDecayAna::VoxelizetheHits(Int_t Event_ID,std::str
             if (drand48() >= exp(-T_drift / Life_Time)) { continue; }
 
             // diffuse the electrons position
-
 
             sigma_T = sqrt(2 * DiffT * T_drift);
             sigma_L = sqrt(2 * DiffL * T_drift);
@@ -391,7 +386,6 @@ std::map<Long64_t,Voxel*>ProtonDecayAna::VoxelizetheHits(Int_t Event_ID,std::str
 
             // add the electron to the vector.
             Electrons.push_back(new Electron());
-
             // convert the electrons x,y to a pixel index
             /* int Pix_Xloc, Pix_Yloc;
              Pix_Xloc = (int) ceil(electron_x / Pix_Size);
@@ -421,16 +415,22 @@ std::map<Long64_t,Voxel*>ProtonDecayAna::VoxelizetheHits(Int_t Event_ID,std::str
 
             //cout<< voxels.size() <<" are created .. " <<endl;
 
+            // See if the VoxelID exists
             if(voxels.count(VoxelID)) {
-
                 voxels[VoxelID]->Q+=1;
-                voxels[VoxelID]->TrackID.push_back(hit->vTrackID.at(ient));
-                //voxels[VoxelID]->PDGCode.push_back(hit->vPdg_code.at(ient));
-                //Find the Index of the Current PDG
-                //std::vector<int>::iterator itr = std::find(voxels[VoxelID]->PDGCode.begin(), voxels[VoxelID]->PDGCode.end(), hit->Pdg_code);
-                //voxels[VoxelID]->QPDg[std::distance(voxels[VoxelID]->PDGCode.begin(), itr)]+=1;
+
+                //Check if TrackID exist in the Voxel
+                std::vector<int>::iterator itr = std::find(voxels[VoxelID]->TrackID.begin(), voxels[VoxelID]->TrackID.end(), hit->vTrackID.at(ient));
+                if(itr==voxels[VoxelID]->TrackID.end()){
+                    voxels[VoxelID]->TrackID.push_back(hit->vTrackID.at(ient));
+                    voxels[VoxelID]->PDGCode.push_back(hit->vPdg_code.at(ient));
+                    voxels[VoxelID]->QTrackID.push_back(1);
+                }else voxels[VoxelID]->QTrackID[std::distance(voxels[VoxelID]->TrackID.begin(), itr)]+=1;
+
             }
             else {
+                // Add new Voxel to the list
+
                 Voxel * v1=new Voxel();
                 v1->VoxelID=VoxelID;
                 v1->Q=1;
@@ -438,7 +438,8 @@ std::map<Long64_t,Voxel*>ProtonDecayAna::VoxelizetheHits(Int_t Event_ID,std::str
                 v1->Y=VoxelY;
                 v1->Z=VoxelZ;
                 v1->TrackID.push_back(hit->vTrackID.at(ient));
-                //v1->PDGCode.push_back(hit->vPdg_code.at(ient));
+                v1->PDGCode.push_back(hit->vPdg_code.at(ient));
+                v1->QTrackID.push_back(1);
                 voxels.insert(pair<Long64_t,Voxel*>(VoxelID,v1));
             }
             indexer += 1;
@@ -446,7 +447,6 @@ std::map<Long64_t,Voxel*>ProtonDecayAna::VoxelizetheHits(Int_t Event_ID,std::str
         }
 
     }
-
     return voxels;
 }
 
@@ -534,7 +534,7 @@ HitMap* ProtonDecayAna::GetSingleEventHits(Long64_t jentry){
     std::vector<int> ParticleTrackIDs;
     if (fChain == 0) {cout<<"Cant Read the Root File.. "<<endl; return 0;}
 
-//TH2F *h2=new TH2F("h","Kaon",100,0,100,100,0,100);
+    //TH2F *h2=new TH2F("h","Kaon",100,0,100,100,0,100);
     Long64_t nbytes = 0, nb = 0;
 
     Long64_t ientry = LoadTree(jentry);
@@ -747,18 +747,19 @@ void ProtonDecayAna::VoxelFloor(double XTrue,double YTrue,double ZTrue,double XS
 
 // Saving to File
 void ProtonDecayAna::InitializeFile(string Name){
-
+    gSystem->Load("libPDvector.so");
     vxfile=TFile::Open(  Name.c_str(),"RECREATE");
     vxtree =new TTree("voxels","Voxels for ProtonDecay");
     //gInterpreter->GenerateDictionary("vector<vector<int> >", "vector");
     vxtree->Branch("EventID",&Event_ID,"EventID/I");
     vxtree->Branch("PdgCode",&Voxel_PdgCode);
     vxtree->Branch("TrackID",&Voxel_TrackID);
+    vxtree->Branch("QTrackID",&Voxel_QTrackID);
     vxtree->Branch("VoxelID",&VoxelID);
     vxtree->Branch("x",&Voxel_x);
     vxtree->Branch("y",&Voxel_y);
     vxtree->Branch("z",&Voxel_z);
-    vxtree->Branch("q",&Voxel_Q);
+    vxtree->Branch("totalq",&Voxel_Q);
 
 }
 void ProtonDecayAna::Clear(){
@@ -770,19 +771,21 @@ void ProtonDecayAna::Clear(){
     Voxel_Q.clear();
     Voxel_PdgCode.clear();
     Voxel_TrackID.clear();
+    Voxel_QTrackID.clear();
 }
 void ProtonDecayAna::SavetoFile(){
     vxtree->Write();
-
 }
 
-void ProtonDecayAna::SaveVoxelsToFile(Int_t StartEvent,Int_t EndEvent,std::string Phase="liquid"){
+void ProtonDecayAna::SaveVoxelsToFile(Int_t StartEvent,Int_t EndEvent,std::string Fname="Voxelv2.root",std::string Phase="liquid"){
     //Create the file
     if(!((EndEvent-StartEvent)<=fChain->GetEntries() && (EndEvent-StartEvent)>0)) {
         cout<<"Choose a range less than what you have in the file"<<endl;
         return;
     }
-    InitializeFile("Voxelsv2.root");
+    //TCLing::LoadPCM("PDvector_rdict.pcm");
+    // Create the File
+    InitializeFile(Fname);
     Int_t count=0;
     for(int i=StartEvent;i<EndEvent;i++){
         std::map<Long64_t,Voxel*> voxels;
@@ -800,13 +803,13 @@ void ProtonDecayAna::SaveVoxelsToFile(Int_t StartEvent,Int_t EndEvent,std::strin
                     Voxel_Q.push_back(x.second->Q);
                     Voxel_TrackID.push_back(x.second->TrackID);
                     Voxel_PdgCode.push_back(x.second->PDGCode);
+                    Voxel_QTrackID.push_back(x.second->QTrackID);
                     count++;
                 } else continue;
             }
 
             if(!Voxel_x.empty() && !Voxel_y.empty() && !Voxel_z.empty() && !Voxel_Q.empty() ){
                 cout<<"Voxel Size -> "<<Voxel_x.size()<<endl;
-
                 vxfile->cd();
                 vxtree->Fill();
 
