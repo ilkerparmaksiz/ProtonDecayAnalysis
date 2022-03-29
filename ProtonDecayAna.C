@@ -27,12 +27,16 @@ void ProtonDecayAna::Getdedx(Int_t Pdg_Code,Int_t limit,Int_t PionHitLimit=2) {
     std::vector<double> range;
     std::vector<double> dedx;
     TH1F *h2 =new TH1F("h2","h2",100,0,600);
+    TH1D *hPIDA=new TH1D("PIDA","PIDA",100,0,30);
 
     for (Long64_t jentry = 0; jentry < nentries; jentry++) {
         Long64_t ientry = LoadTree(jentry);
         if (ientry < 0) break;
         nb = fChain->GetEntry(jentry);
         nbytes += nb;
+
+        double PIDA;
+
 
         int piontrackIds;
         int CountPion=0;
@@ -59,6 +63,8 @@ void ProtonDecayAna::Getdedx(Int_t Pdg_Code,Int_t limit,Int_t PionHitLimit=2) {
 
         int CountPionHits=0;
         Double_t TotalEnergy=0;
+        double tempdedx=0;
+        int Countdedex=0;
         for (int i = 0; i < number_hits; i++) {
             if (hit_track_id->at(i) == piontrackIds) {
                 //dedx.push_back(hit_energy_deposit->at(i)/hit_length->at(i));
@@ -103,19 +109,25 @@ void ProtonDecayAna::Getdedx(Int_t Pdg_Code,Int_t limit,Int_t PionHitLimit=2) {
                 //dx=sqrt((X_.at(i)-X_.at(i+1))*(X_.at(i)-X_.at(i+1)) + (Y_.at(i)-Y_.at(i+1))*(Y_.at(i)-Y_.at(i+1))+(Z_.at(i)-Z_.at(i+1))*(Z_.at(i)-Z_.at(i+1)) );
                 //dedx.push_back(abs(E_.at(i)-E_.at(i+1))/dx);
                 //dedx.push_back((E_.at(i))/dx);
-                dedx.push_back((E_.at(i))/length_.at(i));
+                double fdedx=(E_.at(i))/length_.at(i);
+                dedx.push_back(fdedx);
                 tempHitLength=0;
 
                 for (int k=i;k<X_.size()-1;k++){
                     //tempHitLength+=sqrt((X_.at(k)-X_.at(k+1))*(X_.at(k)-X_.at(k+1)) + (Y_.at(k)-Y_.at(k+1))*(Y_.at(k)-Y_.at(k+1))+(Z_.at(k)-Z_.at(k+1))*(Z_.at(k)-Z_.at(k+1)) );
                     tempHitLength+=length_.at(k);
                 }
+                //if(tempdedx<fdedx){
+                    PIDA+=fdedx*(pow(tempHitLength,0.42));
+                    tempdedx=fdedx;
+                    Countdedex++;
 
+                //}
                 range.push_back(tempHitLength);
             }
-
+            PIDA=PIDA/Countdedex;
+            hPIDA->Fill(PIDA);
         }
-
         if (limit!=0 && jentry==limit) break;
 
     }
@@ -124,7 +136,7 @@ void ProtonDecayAna::Getdedx(Int_t Pdg_Code,Int_t limit,Int_t PionHitLimit=2) {
     cout<<Tittle<<endl;
 
     TCanvas *c1= new TCanvas("c1",Tittle.c_str(),1024,800);
-    c1->Divide(1,2);
+    c1->Divide(1,3);
     TGraph *gr;
     gr = new TGraph(dedx.size(), &range[0], &dedx[0]);
     gr->SetTitle("DeDx vs  ResidualRange");
@@ -138,6 +150,9 @@ void ProtonDecayAna::Getdedx(Int_t Pdg_Code,Int_t limit,Int_t PionHitLimit=2) {
     c1->cd(2);
     h2->GetXaxis()->SetTitle("Total Deposited Energy (MeV)");
     h2->Draw();
+    c1->cd(3);\
+    hPIDA->GetXaxis()->SetTitle("PIDA");
+    hPIDA->Draw();
 
 }
 
@@ -305,6 +320,7 @@ std::map<Long64_t,Voxel*>ProtonDecayAna::VoxelizetheHits(Int_t Event_ID,std::str
     }
 
     HitMap*  hit= GetSingleEventHits(Event_ID);
+
     std::map<Long64_t ,Voxel*> voxels;
     std::vector<Electron*> Electrons;
    // if (hit->StartX.size()==0) {std::cout<<"StartX is empty .."; return voxels; }
@@ -586,11 +602,64 @@ HitMap* ProtonDecayAna::GetSingleEventHits(Long64_t jentry){
             CountPionHits++;
 
     }
+    gvhits.push_back(hit);
     return hit;
 
 }
 
+// This function saves the hits to the voxel file
+void ProtonDecayAna::SaveHits(){
 
+    Int_t hEventID;
+    std::vector<int> hvPdg_code;
+    std::vector<int> hvTrackID;
+    std::vector<double>hStartX;
+    std::vector<double>hStartY;
+    std::vector<double>hStartZ;
+    std::vector<double>hStartT;
+    std::vector<double>hEndX;
+    std::vector<double>hEndY;
+    std::vector<double>hEndZ;
+    std::vector<double>hEndT;
+    std::vector<double>hDepositedEE;
+
+
+    TTree *trhits =new TTree("event_tree","Hits");
+    trhits->Branch("EventID",&hEventID,"EventID/I");
+    trhits->Branch("PdgCode",&hvPdg_code);
+    trhits->Branch("TrackID",&hvTrackID);
+    trhits->Branch("StartX",&hStartX);
+    trhits->Branch("StartY",&hStartY);
+    trhits->Branch("StartZ",&hStartZ);
+    trhits->Branch("EndX",&hEndX);
+    trhits->Branch("EndY",&hEndY);
+    trhits->Branch("EndZ",&hEndZ);
+    trhits->Branch("DepositedE",&hDepositedEE);
+
+    //gInterpreter->GenerateDictionary("vector<vector<int> >", "vector");
+    std::cout << "Saving the Hit Information ..." <<std::endl;
+    for (auto &x:gvhits){
+        hEventID=x->EventID;
+        hvPdg_code=x->vPdg_code;
+        hvTrackID=x->vTrackID;
+        hStartX=x->StartX;
+        hStartY=x->StartY;
+        hStartZ=x->StartZ;
+        hStartT=x->StartT;
+        hEndX=x->EndX;
+        hEndY=x->EndY;
+        hEndZ=x->EndZ;
+        hEndT=x->EndT;
+        hDepositedEE=x->DepositedEE;
+
+        trhits->Fill();
+
+    }
+    std::cout << gvhits.size() <<  " many event hits are saved!" <<std::endl;
+    trhits->Write();
+    //gvxfile->Write();
+
+}
 void ProtonDecayAna::PlotHits(Int_t EventID,Int_t Pdg_Code) {
 
     if (fChain == 0) {cout<<"Cant Read the Root File.. "<<endl; return;};
@@ -748,33 +817,33 @@ void ProtonDecayAna::VoxelFloor(double XTrue,double YTrue,double ZTrue,double XS
 // Saving to File
 void ProtonDecayAna::InitializeFile(string Name){
     gSystem->Load("libPDvector.so");
-    vxfile=TFile::Open(  Name.c_str(),"RECREATE");
-    vxtree =new TTree("voxels","Voxels for ProtonDecay");
+    gvxfile=TFile::Open(  Name.c_str(),"RECREATE");
+    gvxtree =new TTree("voxels","Voxels for ProtonDecay");
     //gInterpreter->GenerateDictionary("vector<vector<int> >", "vector");
-    vxtree->Branch("EventID",&Event_ID,"EventID/I");
-    vxtree->Branch("PdgCode",&Voxel_PdgCode);
-    vxtree->Branch("TrackID",&Voxel_TrackID);
-    vxtree->Branch("QTrackID",&Voxel_QTrackID);
-    vxtree->Branch("VoxelID",&VoxelID);
-    vxtree->Branch("x",&Voxel_x);
-    vxtree->Branch("y",&Voxel_y);
-    vxtree->Branch("z",&Voxel_z);
-    vxtree->Branch("totalq",&Voxel_Q);
+    gvxtree->Branch("EventID",&gEvent_ID,"EventID/I");
+    gvxtree->Branch("PdgCode",&gvvVoxel_PdgCode);
+    gvxtree->Branch("TrackID",&gvvVoxel_TrackID);
+    gvxtree->Branch("QTrackID",&gvvVoxel_PdgCode);
+    gvxtree->Branch("VoxelID",&gvVoxelID);
+    gvxtree->Branch("x",&gvVoxel_x);
+    gvxtree->Branch("y",&gvVoxel_y);
+    gvxtree->Branch("z",&gvVoxel_z);
+    gvxtree->Branch("totalq",&gvVoxel_Q);
 
 }
 void ProtonDecayAna::Clear(){
-    Event_ID=-1;
-    VoxelID.clear();
-    Voxel_x.clear();
-    Voxel_y.clear();
-    Voxel_z.clear();
-    Voxel_Q.clear();
-    Voxel_PdgCode.clear();
-    Voxel_TrackID.clear();
-    Voxel_QTrackID.clear();
+    gEvent_ID=-1;
+    gvVoxelID.clear();
+    gvVoxel_x.clear();
+    gvVoxel_y.clear();
+    gvVoxel_z.clear();
+    gvVoxel_Q.clear();
+    gvvVoxel_PdgCode.clear();
+    gvvVoxel_TrackID.clear();
+    gvvVoxel_QTrackID.clear();
 }
 void ProtonDecayAna::SavetoFile(){
-    vxtree->Write();
+    gvxtree->Write();
 }
 
 void ProtonDecayAna::SaveVoxelsToFile(Int_t StartEvent,Int_t EndEvent,std::string Fname="Voxelv2.root",std::string Phase="liquid"){
@@ -793,25 +862,25 @@ void ProtonDecayAna::SaveVoxelsToFile(Int_t StartEvent,Int_t EndEvent,std::strin
 
         if(voxels.size()!=0){
             Clear();
-            Event_ID=i;
+            gEvent_ID=i;
             for (auto &x:voxels){
                 if(x.second->Q>=1){
-                    VoxelID.push_back(x.second->VoxelID);
-                    Voxel_x.push_back(x.second->X);
-                    Voxel_y.push_back(x.second->Y);
-                    Voxel_z.push_back(x.second->Z);
-                    Voxel_Q.push_back(x.second->Q);
-                    Voxel_TrackID.push_back(x.second->TrackID);
-                    Voxel_PdgCode.push_back(x.second->PDGCode);
-                    Voxel_QTrackID.push_back(x.second->QTrackID);
+                    gvVoxelID.push_back(x.second->VoxelID);
+                    gvVoxel_x.push_back(x.second->X);
+                    gvVoxel_y.push_back(x.second->Y);
+                    gvVoxel_z.push_back(x.second->Z);
+                    gvVoxel_Q.push_back(x.second->Q);
+                    gvvVoxel_TrackID.push_back(x.second->TrackID);
+                    gvvVoxel_PdgCode.push_back(x.second->PDGCode);
+                    gvvVoxel_QTrackID.push_back(x.second->QTrackID);
                     count++;
                 } else continue;
             }
 
-            if(!Voxel_x.empty() && !Voxel_y.empty() && !Voxel_z.empty() && !Voxel_Q.empty() ){
-                cout<<"Voxel Size -> "<<Voxel_x.size()<<endl;
-                vxfile->cd();
-                vxtree->Fill();
+            if(!gvVoxel_x.empty() && !gvVoxel_y.empty() && !gvVoxel_z.empty() && !gvVoxel_Q.empty() ){
+                cout<< "EventID = " <<gEvent_ID <<" Voxel Size -> "<<gvVoxel_x.size()<<endl;
+                gvxfile->cd();
+                gvxtree->Fill();
 
             }else {
                 std::cout<<"some of the vectors are empty"<<endl;
@@ -822,7 +891,8 @@ void ProtonDecayAna::SaveVoxelsToFile(Int_t StartEvent,Int_t EndEvent,std::strin
     }
     if(count>0){
         SavetoFile();
-        vxfile->Close();
+        SaveHits();
+        gvxfile->Close();
     }
 
 

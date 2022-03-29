@@ -209,22 +209,23 @@ public :
     void SavetoFile();
     void SaveVoxelsToFile(Int_t StartEvent,Int_t EndEvent,std::string Fname,std::string Phase);
     void PlotVoxels(Int_t EventID,std::string fileName) ;
+    void SaveHits();
     TTree * GetVoxelsFromFile(Int_t EventID,std::string fileName);
 
         // Writing Voxels to root file
-    TTree *vxtree= nullptr;
+    TTree *gvxtree= nullptr;
     TFile *f= nullptr;
-    TFile *vxfile= nullptr;
-    Int_t Event_ID;
-    std::vector<Long64_t>VoxelID;
-    std::vector<std::vector<int>>Voxel_PdgCode;
-    std::vector<int>Voxel_x;
-    std::vector<int>Voxel_y;
-    std::vector<int>Voxel_z;
-    std::vector<int>Voxel_Q;
-    std::vector<std::vector<int>>Voxel_QTrackID;
-    std::vector<std::vector<int>>Voxel_TrackID;
-
+    TFile *gvxfile= nullptr;
+    Int_t gEvent_ID;
+    std::vector<Long64_t>gvVoxelID;
+    std::vector<std::vector<int>>gvvVoxel_PdgCode;
+    std::vector<int>gvVoxel_x;
+    std::vector<int>gvVoxel_y;
+    std::vector<int>gvVoxel_z;
+    std::vector<int>gvVoxel_Q;
+    std::vector<std::vector<int>>gvvVoxel_QTrackID;
+    std::vector<std::vector<int>>gvvVoxel_TrackID;
+    std::vector<HitMap*> gvhits;
     };
 
 #endif
