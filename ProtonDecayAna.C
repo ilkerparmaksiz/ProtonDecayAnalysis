@@ -138,21 +138,30 @@ void ProtonDecayAna::Getdedx(Int_t Pdg_Code,Int_t limit,Int_t PionHitLimit=2) {
     TCanvas *c1= new TCanvas("c1",Tittle.c_str(),1024,800);
     c1->Divide(1,3);
     TGraph *gr;
+    int Color=0;
+    if(Pdg_Code==321)
+        Color=kRed;
+    else
+        Color=kBlue;
     gr = new TGraph(dedx.size(), &range[0], &dedx[0]);
     gr->SetTitle("DeDx vs  ResidualRange");
     gr->GetXaxis()->SetTitle("Residual Range (cm)");
     gr->GetYaxis()->SetTitle("dedx (MeV/cm)");
+    gr->SetFillColor(Color);
     gr->SetMinimum(0);
     gr->SetMaximum(60);
     gr->GetXaxis()->SetLimits(0,40);
     c1->cd(1);
-    gr->Draw("AP");
+    gr->Draw("AP same");
     c1->cd(2);
     h2->GetXaxis()->SetTitle("Total Deposited Energy (MeV)");
-    h2->Draw();
+    h2->SetFillColor(Color);
+    h2->Draw("same");
     c1->cd(3);\
     hPIDA->GetXaxis()->SetTitle("PIDA");
-    hPIDA->Draw();
+    hPIDA->SetFillColor(Color);
+
+    hPIDA->Draw("same");
 
 }
 
